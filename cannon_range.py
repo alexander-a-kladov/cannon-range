@@ -16,8 +16,10 @@ WIDTH, HEIGHT = 1200, 800
 CANNON_Y = 0
 CANNON_MOVE_SPEED = 0.25
 BARREL_MIN_ANGLE = 0
-BARREL_MAX_ANGLE = 70
+BARREL_MAX_ANGLE = 80
 BARREL_LENGTH = 1.5
+
+CAMERA_MOVE_SPEED = 0.5
 
 # Reload settings
 RELOAD_TIME = 0.5  # seconds
@@ -25,7 +27,7 @@ RELOAD_TIME = 0.5  # seconds
 # Target settings
 NUM_TARGETS = 20
 TARGET_MIN_DIST = 50
-TARGET_MAX_DIST = 100
+TARGET_MAX_DIST = 250
 TARGET_HORIZON_Y = 0
 
 # Colors
@@ -36,6 +38,8 @@ COLOR_TANK = (0.5, 0.5, 0)
 COLOR_AV = (0.5, 0, 0.5)
 COLOR_EXPLOSION = (1, 0.5, 0)
 COLOR_DIRT = (0.4, 0.3, 0.1)
+
+FONT = None
 
 # Utility clamp function
 def clamp(x, minimum, maximum):
@@ -129,11 +133,14 @@ class DirtMark:
 
 # Initialize pygame and OpenGL
 def init():
+    global FONT
     pygame.init()
     pygame.display.set_mode((WIDTH, HEIGHT), DOUBLEBUF | OPENGL)
+    FONT = pygame.font.SysFont("Arial", 32)
     glEnable(GL_DEPTH_TEST)
     glClearColor(0.5, 0.8, 1.0, 1)  # Sky blue
-
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
     # Perspective projection
     gluPerspective(45, (WIDTH / HEIGHT), 0.1, 5000.0)
     gluLookAt(0, 2, -4, 0, 0, 50, 0, 1, 0)
@@ -177,10 +184,17 @@ def draw_cannon_barrel():
 def draw_projectile():
     draw_cylinder(radius=0.1, length=2, color=COLOR_PROJECTILE)
 
-def move_camera(camera_x):
+def move_camera(camera_x, camera_y):
     glLoadIdentity()
     gluPerspective(45, (WIDTH / HEIGHT), 0.1, 5000.0)
-    gluLookAt(camera_x, 2, -4, camera_x, 0, 50, 0, 1, 0)
+    gluLookAt(camera_x, 2+camera_y, -4, camera_x, 0, 50, 0, 1, 0)
+
+def draw_text(x, y, text):                                                
+    textSurface = FONT.render(text, True, (255, 255, 66, 255)).convert_alpha()
+    textData = pygame.image.tostring(textSurface, "RGBA", True)
+    glWindowPos2d(x, y)
+    glDrawPixels(textSurface.get_width(), textSurface.get_height(), GL_RGBA, GL_UNSIGNED_BYTE, textData)
+
 
 # Main function
 def main():
@@ -191,6 +205,8 @@ def main():
     cannon_x = 0.0
     barrel_angle = 45.0  # degrees
     reload_timer = 0.0
+    camera_y = 0
+    shell_spent = 0
 
     # Projectiles list
     projectiles = []
@@ -216,11 +232,11 @@ def main():
             cannon_x += CANNON_MOVE_SPEED
             cannon_x = clamp(cannon_x, -100, 100)
             # Perspective projection
-            move_camera(cannon_x)
+            move_camera(cannon_x, camera_y)
         if keys[K_RIGHT]:
             cannon_x -= CANNON_MOVE_SPEED
             cannon_x = clamp(cannon_x, -100, 100)
-            move_camera(cannon_x)
+            move_camera(cannon_x, camera_y)
         # Adjust barrel angle
         if keys[K_UP]:
             barrel_angle += 30 * dt
@@ -228,6 +244,14 @@ def main():
         if keys[K_DOWN]:
             barrel_angle -= 30 * dt
             barrel_angle = clamp(barrel_angle, BARREL_MIN_ANGLE, BARREL_MAX_ANGLE)
+        if keys[K_q]:
+            camera_y += CAMERA_MOVE_SPEED
+            camera_y =  clamp(camera_y, 0, 50)
+            move_camera(cannon_x, camera_y)
+        if keys[K_a]:
+            camera_y -= CAMERA_MOVE_SPEED
+            camera_y =  clamp(camera_y, 0, 50)
+            move_camera(cannon_x, camera_y)
 
         # Fire projectile
         if keys[K_SPACE] and reload_timer <= 0:
@@ -239,6 +263,7 @@ def main():
             proj_vel = np.array([0, vel_y, vel_z])
             projectiles.append({"pos": proj_pos, "vel": proj_vel, "active": True})
             reload_timer = RELOAD_TIME
+            shell_spent += 1
 
         if reload_timer > 0:
             reload_timer -= dt
@@ -329,6 +354,10 @@ def main():
         for explosion in explosions:
             explosion.draw()
 
+        shell_spent_t = f"Shells: {shell_spent}"
+        barrel_angle_t = f"Angle: {barrel_angle:.2f}"
+        draw_text(5,HEIGHT-40,shell_spent_t)
+        draw_text(WIDTH-180,HEIGHT-40,barrel_angle_t)
         pygame.display.flip()
 
     pygame.quit()
