@@ -40,6 +40,8 @@ COLOR_EXPLOSION = (1, 0.5, 0)
 COLOR_DIRT = (0.4, 0.3, 0.1)
 
 FONT = None
+CANNON_SOUND = None
+EXPLOSION_SOUND = None
 
 # Utility clamp function
 def clamp(x, minimum, maximum):
@@ -133,10 +135,13 @@ class DirtMark:
 
 # Initialize pygame and OpenGL
 def init():
-    global FONT
+    global FONT, CANNON_SOUND, EXPLOSION_SOUND
     pygame.init()
+    pygame.mixer.init()
     pygame.display.set_mode((WIDTH, HEIGHT), DOUBLEBUF | OPENGL)
     FONT = pygame.font.SysFont("Arial", 32)
+    CANNON_SOUND = pygame.mixer.Sound("sounds/cannon.wav")
+    EXPLOSION_SOUND = pygame.mixer.Sound("sounds/explosion.wav")
     glEnable(GL_DEPTH_TEST)
     glClearColor(0.5, 0.8, 1.0, 1)  # Sky blue
     glEnable(GL_BLEND)
@@ -256,6 +261,7 @@ def main():
         # Fire projectile
         if keys[K_SPACE] and reload_timer <= 0:
             # Calculate initial velocity vector of projectile
+            CANNON_SOUND.play()
             angle_rad = math.radians(barrel_angle)
             vel_y = math.sin(angle_rad) * 50  # speed scale
             vel_z = math.cos(angle_rad) * 50
@@ -287,6 +293,7 @@ def main():
                     dist = np.linalg.norm(proj["pos"] - target["pos"])
                     if dist < 3.0:
                         # Direct hit
+                        EXPLOSION_SOUND.play()
                         target["active"] = False
                         explosions.append(Explosion(target["pos"]))
                         hit_any = True
